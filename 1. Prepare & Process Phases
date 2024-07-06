@@ -5,7 +5,7 @@
 # PREPARE PHASE
 # Installing and loading the packages
 
-install.packages(leaflet.extras)
+install.packages('leaflet.extras')
 install.packages("leaflet")
 installed.packages("webr")
 install.packages("Matrix")
@@ -16,6 +16,8 @@ install.packages("https://cran.r-project.org/src/contrib/Archive/mnormt/mnormt_1
 install.packages("tidyverse")
 install.packages("skimr") # package required for data cleaning
 install.packages("dplyr")
+install.packages("ggalluvial")
+
 
 # loading packages
 library(tidyverse) # meta package of all tidyverse packages
@@ -27,6 +29,9 @@ library(Matrix)
 library(webr)
 library(dplyr)
 library(ggplot2)
+library(leaflet.extras)
+library(htmltools)
+library(ggalluvial)
 
 # Importing cyclistic trip datasets
 trip_202301 <- read_csv("trip_202301.csv")
