@@ -1,0 +1,418 @@
+
+
+# ANALYZE PHASE
+
+# Here are some calculations done one by one
+#MEAN
+aggregate(cyclistic_2023_cleaned$ride_length ~ 
+            cyclistic_2023_cleaned$user_type, FUN = mean)
+#MEDIAN
+aggregate(cyclistic_2023_cleaned$ride_length ~ 
+            cyclistic_2023_cleaned$user_type, FUN = median)
+#MAX
+aggregate(cyclistic_2023_cleaned$ride_length ~ 
+            cyclistic_2023_cleaned$user_type, FUN = max)
+#MIN
+aggregate(cyclistic_2023_cleaned$ride_length ~ 
+            cyclistic_2023_cleaned$user_type, FUN = min)
+
+# Calculations all in one, Mean, median, max, and min ride length of Casual and Member Users
+cyclistic_2023_cleaned %>%
+  group_by(user_type) %>% 
+  summarise(avg_ride_length = mean(ride_length), median_length = 
+              median(ride_length), max_ride_length = max(ride_length), 
+            min_ride_length = min(ride_length))
+
+# Sorting previous code further to include day of week to see average ride length 
+# by each day for member and casual users:
+
+aggregate(cyclistic_2023_cleaned$ride_length ~ 
+            cyclistic_2023_cleaned$user_type 
+          + cyclistic_2023_cleaned$day_of_week, FUN = mean)
+
+# We need to rearrange the above data such that the day of week is from 
+# Sunday-Saturday to make it orderly using the ordered() function.
+
+#ordered function
+#general syntax: ordered(x, levels = c("level_1","level_2","level_3",...))
+
+cyclistic_2023_cleaned$day_of_week <- ordered(cyclistic_2023_cleaned$day_of_week,
+                                              levels=c("Sunday","Monday","Tuesday",
+                                                       "Wednesday","Thursday","Friday",
+                                                       "Saturday"))
+
+# Total No of Rides by User Type (Ride count & Percentage) Method 1
+cyclistic_2023_cleaned %>% 
+  group_by(user_type) %>% 
+  summarise(ride_count = length(ride_id), ride_percentage = 
+              (length(ride_id) / nrow(cyclistic_2023_cleaned)) * 100)
+
+# Total No of Rides by User Type (Ride count & Percentage) Method 2
+total_rides_by_user_type <- cyclistic_2023_cleaned %>% 
+  select(user_type) %>% 
+  group_by(user_type) %>% 
+  summarise(total_rides = n(), .groups = 'drop') %>% 
+  mutate(percentage = scales::percent(total_rides/sum(total_rides), accuracy = 0.1))
+
+total_rides_by_user_type
+
+# Plot 1a. Total No of Rides by User Type (Donut Chart) - not finished
+# Making a donut chart with webr package
+# I don't know why, but chart title not showing in the chart
+my_colors <- c("#FA8E1B", "#4394D1")
+
+PieDonut(total_rides_by_user_type, aes(user_type, count = total_rides), r0=0,
+         ratioByGroup = TRUE,color = "white",
+         title="Total No of Rides by User Type", showPieName = FALSE, 
+         titlesize = 5,pieLabelSize = 6,showDonutName = TRUE,
+               labelpositionThreshold = 1, labelposition = 3, pieAlpha = 1) + 
+  scale_fill_manual(values = my_colors) +
+  theme_void()
+
+# Plot 1b. Total No of Rides by User Type (Bar Chart)
+ggplot(cyclistic_2023_cleaned, aes(x = user_type, fill=user_type)) +
+  geom_bar() +
+  labs(fill="") + 
+  xlab("") +
+  ylab("") +
+  scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M"),
+                     breaks = seq(0, 4000000, 500000))+
+  theme_light()+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 18, face = "bold"),
+        legend.text = element_blank(),
+        axis.title = element_blank(), legend.position="none",
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"),
+        plot.subtitle = element_text(vjust = 3, size = 20))+
+  ggtitle("Total No of Rides by User Type")+
+  labs(subtitle=paste0("For the period between January 2023 \nand January 2024"))+
+  geom_text(stat='count', aes(label=after_stat(count)), vjust=+2, 
+            color="white", size = 8)+
+  scale_fill_manual(values = my_colors)
+
+ggsave('Total No of Rides by User Type.jpg',
+       width=7,
+       height=9)
+       
+# Bike Preference by User Type
+# No of Rides by Bike Type and User Type
+cyclistic_2023_cleaned %>% 
+  group_by(user_type, bike_type) %>% 
+  summarise(number_of_rides = n())
+
+# Plot 2. No of Rides by Bike Type and User Type
+data_bar <- cyclistic_2023_cleaned %>% 
+  group_by(user_type, bike_type) %>% 
+  summarise(count_of = n()) 
+
+ggplot(data_bar, aes(x=reorder(bike_type,bike_type, function(x)-length(x)), 
+                      y= count_of, fill=user_type)) + 
+    geom_bar(stat="identity") + 
+    coord_flip()+
+    labs( title = "Bike Preference by User Type", subtitle = 
+         "For the period between January 2023 and January 2024", 
+          fill = "Bike type", x = "", y = "") + 
+  theme_light()+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 18, face = "bold"),
+        legend.text = element_text(size=16),
+        legend.position = c(0.90, 0.91),
+        legend.title = element_blank(),
+        legend.background = element_rect(fill = "white", color = "gray"),
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"),
+        plot.subtitle = element_text(vjust = 3, size = 20))+
+  geom_text(aes(label=count_of), position = position_stack(vjust = .5), color="black", size = 8) + 
+  scale_fill_manual(values = my_colors)+
+  scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M"),
+                     breaks = seq(0, 3500000, 500000))
+
+ggsave('No of Rides by Bike Type and User Type.jpg',
+       width=12,
+       height=8)
+       
+# Month
+# No of Rides by Month and User Type
+total_rides_by_month <- cyclistic_2023_cleaned %>% 
+  select(user_type, month) %>% 
+  group_by(user_type, month) %>% 
+  summarise(total_rides = n()) %>% 
+  mutate(percentage = scales::percent(total_rides/sum(total_rides), accuracy = 0.1)) %>% 
+  ungroup()
+
+knitr::kable(total_rides_by_month) 
+
+# Plot 3. No of Rides by Month and User Type
+cyclistic_2023_cleaned %>% 
+  mutate(month = month(started_at, label=TRUE)) %>%  
+  group_by(user_type,month) %>% 
+  summarize(number_of_rides = n(),average_duration=mean(ride_length)) %>% 
+  arrange(user_type,month) %>% 
+  ggplot(aes(x=month,y=number_of_rides,fill=user_type)) + geom_col(position = "dodge")+
+  scale_y_continuous(labels = scales::label_number(scale = .001, suffix = "K"))+
+  #scale_fill_manual(values=c("#FA8E1B", "#4394D1"))+ # Manually change bar's color
+  theme_light()+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 18, face = "bold"),
+        legend.text = element_text(size=16),
+        legend.position = c(0.14, 0.94), 
+        legend.background = element_rect(fill = "white", color = "gray"), 
+        legend.direction="horizontal", axis.title = element_blank(), 
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"),
+        plot.subtitle = element_text(vjust = 3, size = 20))+
+  ggtitle("No of Rides by Month and User Type")+
+  #labs(subtitle=paste0("For 2023"))+
+  labs(fill="")
+
+  ggsave('No of Rides by Month and User Type.jpg',
+       width=12,
+       height=8)
+
+# Week
+# Average ride duration by each day of week, members vs. casual
+# Method 1
+cyclistic_2023_cleaned %>% 
+  mutate(weekday = wday(started_at,label=TRUE)) %>%  
+  group_by(user_type,weekday) %>% 
+  summarize(number_of_rides = n(),average_duration=mean(ride_length)) %>% 
+  arrange(user_type,weekday)
+
+# Average ride duration by each day of week, members vs. casual
+# Method 2
+aggregate(cyclistic_2023_cleaned$ride_length ~ cyclistic_2023_cleaned$user_type 
+          + cyclistic_2023_cleaned$day_of_week, FUN = mean)
+
+# Plot 4. Total no of Riders per day of week
+cyclistic_2023_cleaned %>% 
+  mutate(weekday = wday(started_at,label=TRUE)) %>%  #label=TRUE returns the weekday in characters
+  group_by(user_type,weekday) %>% 
+  summarize(number_of_rides = n(),average_duration=mean(ride_length)) %>% 
+  arrange(user_type,weekday) %>% 
+  ggplot(aes(x=weekday,y=number_of_rides,fill=user_type)) + 
+  geom_col(position = "stack")+
+  geom_text(stat = "stratum", aes(label=after_stat(count), stratum = user_type),size = 8)+
+  #geom_text(stat='count', aes(label=after_stat(count)), vjust=+2, 
+            #color="white", size = 8, position = position_stack(vjust = 0.5))+
+  scale_fill_hue(labels = c("Casual", "Member"))+
+  scale_y_continuous(labels = scales::label_number(scale = .001, suffix = "K"))+
+  xlab("X-axis title") +
+  ylab("Y-axis title") + 
+  theme_light()+
+  # scale_fill_manual(values = c("#9E9AC8", "#6A51A3"))+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 18, face = "bold"),
+        legend.text = element_text(size=16),
+        legend.position = c(0.14, 0.94), 
+        legend.background = element_rect(fill = "white", color = "gray"), 
+        legend.direction="horizontal", axis.title = element_blank(), 
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"))+
+  ggtitle("No of Riders by Weekday and User Type")+
+  labs(fill="")
+  
+ggsave('No of Riders by Weekday and Rider Type.jpg',
+       width=12,
+       height=8)
+
+# Hour
+# Total Rides by Start Time and User Type
+total_rides_by_hour <- cyclistic_2023_cleaned %>%
+  select(user_type, Started_Hour) %>% 
+  group_by(user_type, Started_Hour) %>% 
+  summarise(total_rides = n()) %>% 
+  mutate(percentage = scales::percent(total_rides/sum(total_rides), accuracy = 0.1)) %>% 
+  ungroup()
+
+knitr::kable(total_rides_by_hour) 
+
+# Plot 5. Total Rides by Start Time and User Type
+ggplot(total_rides_by_hour, aes(x = Started_Hour, y = total_rides, color = user_type)) +
+  geom_line(aes(group = user_type), linewidth = 2) +
+  scale_y_continuous(labels = scales::comma) +
+  # scale_color_manual(values = my_colors) + # Manually change bar's color
+  theme_light()+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 18, face = "bold"),
+        legend.title = element_blank(),legend.text = element_text(size=16),
+        legend.position = c(0.14, 0.94), 
+        legend.background = element_rect(fill = "white", color = "gray"), 
+        legend.direction="horizontal", axis.title = element_blank(), 
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"),
+        plot.subtitle = element_text(vjust = 3, size = 20))+
+  ggtitle("Total Rides by Start Time and User Type")+
+  labs(fill="")+
+  scale_y_continuous(labels = scales::label_number(scale = .001, suffix = "K"),
+                     breaks = seq(0, 320000, 50000))
+
+ggsave('Total Rides by Start Time and User Type.jpg',
+       width=12,
+       height=8)
+
+# ______________
+# Most popular stations   Method 1
+# Top 10 most popular start stations for casuals
+top_start_casual <- cyclistic_2023_cleaned %>% 
+  filter(!is.na(start_station_name), user_type == "Casual") %>% 
+  group_by(user_type, start_station_name) %>% 
+  summarise(total_rides = n(), .groups = 'drop') %>%
+  arrange(desc(total_rides)) %>% 
+  head(10)
+
+top_start_casual
+
+# Top 10 most popular start stations for members
+top_start_member <- cyclistic_2023_cleaned %>% 
+  filter(!is.na(start_station_name), user_type == "Member") %>% 
+  group_by(user_type, start_station_name) %>% 
+  summarise(total_rides = n(), .groups = 'drop') %>%
+  arrange(desc(total_rides)) %>% 
+  head(10)
+
+top_start_member
+# ______________
+
+# Most popular stations   Method 2
+# Top 10 Most Popular Start Stations for Casual Users
+top_start_st_casual <- cyclistic_2023_cleaned %>%
+  filter(!is.na(start_station_name), user_type == "Casual") %>% 
+  group_by(user_type, start_station_name) %>%
+  summarise(count = n(), .groups = "drop") %>% 
+  top_n(10, wt = count)
+
+top_start_st_casual
+
+# Top 10 Most Popular Start Stations for Member Users
+top_start_st_member <- cyclistic_2023_cleaned %>%
+  filter(!is.na(start_station_name), user_type == "Member") %>% 
+  group_by(user_type, start_station_name) %>%
+  summarise(count = n(), .groups = "drop") %>% 
+  top_n(10, wt = count)
+
+top_start_st_member
+
+# Plot 6. Top 10 Most Popular Start Stations for Casual Users
+ggplot(top_start_st_casual, aes(x = reorder(start_station_name, -count), 
+                               y = count, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Top 10 Most Popular Start Stations for Casual Users",
+       x = "Start Station", y = "Number of Rides") +
+  theme_light()+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_blank(),
+        legend.text = element_text(size=16),
+        legend.position = c(0.90, 0.91),
+        legend.title = element_blank(),
+        legend.background = element_rect(fill = "white", color = "gray"),
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"),
+        plot.subtitle = element_text(vjust = 3, size = 20))+
+  geom_text(aes(label=count), position = position_stack(vjust = .9), color="black", size = 6) + 
+  # scale_fill_manual(values = my_colors)+
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10))+
+  scale_y_continuous(labels = scales::label_number(scale = .001, suffix = "K"),
+                     breaks = seq(0, 45000, 10000))
+
+ggsave('Top 10 Most Popular Start Stations for Casual Users.jpg',
+       width=12,
+       height=8)
+
+# Plot 7. Top 10 Most Popular Start Stations for Member Users
+ggplot(top_start_st_member, aes(x = reorder(start_station_name, -count), 
+                               y = count, fill = user_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Top 10 Most Popular Start Stations for Member Users",
+       x = "Start Station", y = "Number of Rides") +
+  theme_light()+
+  scale_fill_manual(values=c("#00BFC4"))+
+  theme(plot.margin = margin(1.2,0.5,0.5,0.5, "cm"),
+        axis.text = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_blank(),
+        legend.text = element_text(size=16),
+        legend.position = c(0.90, 0.91),
+        legend.title = element_blank(),
+        legend.background = element_rect(fill = "white", color = "gray"),
+        plot.title = element_text(vjust = 5, size = 26, face = "bold"),
+        plot.subtitle = element_text(vjust = 3, size = 20))+
+  geom_text(aes(label=count), position = position_stack(vjust = .9), color="black", size = 6) + 
+  # scale_fill_manual(values = my_colors)+
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10))+
+  scale_y_continuous(labels = scales::label_number(scale = .001, suffix = "K"),
+                     breaks = seq(0, 30000, 5000))
+
+ggsave('Top 10 Most Popular Start Stations for Member Users.jpg',
+       width=12,
+       height=8)
+
+
+
+
+# ______________
+# # Creating a leaflet map - didn't work because having the following error:
+# Error in guessLatLongCols(names(obj)) : Couldn't infer longitude/latitude columns
+
+# Creating a new variable to distinguish stations by number of rides
+library(leaflet.extras)
+top_start_stations <- top_start_stations %>% 
+  mutate(circle_size = case_when(count>10000 & count<=20000 ~ 6,
+                                 count>20000 & count<=30000 ~ 7,
+                                 count>30000 & count<=40000 ~ 8,
+                                 count>40000 & count<=50000 ~ 9,
+                                 TRUE ~ 10))
+
+# subsetting top stations for casuals and members
+casual <- top_start_stations %>% 
+  filter(user_type == "casual")
+
+member <- top_start_stations %>% 
+  filter(user_type == "member")
+
+# Creating a color palette
+mypalette <- colorFactor(my_colors, domain = top_start_stations$user_type)
+
+# Preparing the text for the tooltip
+mytext_cas <- paste(
+  "Station: ", casual$start_station_name, "<br/>", 
+  "User type: ", casual$user_type, "<br/>", 
+  "Total rides: ", casual$count, sep="") %>%
+  lapply(htmltools::HTML)
+
+mytext_mem <- paste(
+  "Station: ", member$start_station_name, "<br/>", 
+  "User type: ", member$user_type, "<br/>", 
+  "Total rides: ", member$count, sep="") %>%
+  lapply(htmltools::HTML)
+
+# final map
+leaflet(top_start_stations) %>% 
+  addProviderTiles("CartoDB")  %>% 
+  addCircleMarkers(data = casual,
+                   fillColor = ~mypalette(user_type), 
+                   fillOpacity = 0.7, 
+                   color = "white", 
+                   radius = ~circle_size, 
+                   stroke = FALSE,
+                   label = mytext_cas,
+                   labelOptions = labelOptions(style = list("font-weight"="normal", 
+                                                            padding = "3px 8px"), textsize = "12px", direction = "auto"),
+                   group = "casual") %>%
+  addCircleMarkers(data = member,
+                   fillColor = ~mypalette(user_type), 
+                   fillOpacity = 0.7, 
+                   color = "white", 
+                   radius = ~circle_size, 
+                   stroke = FALSE,
+                   label = mytext_mem,
+                   labelOptions = labelOptions(style = list("font-weight"="normal", 
+                                                            padding = "3px 8px"), textsize = "12px", direction = "auto"),
+                   group = "member") %>%
+  addLegend(pal = mypalette, 
+            values = ~user_type, 
+            opacity = 0.7, 
+            title = "User type", 
+            position = "bottomright" ) %>% 
+  addLayersControl(overlayGroups = c("casual", "member"),
+                   options = layersControlOptions(collapsed = FALSE)) %>% 
+  leaflet.extras::addResetMapButton()
+
+
+
