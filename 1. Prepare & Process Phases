@@ -1,0 +1,233 @@
+
+## Google Data Analytics Certification Capstone Case Study 1
+#  Cyclistic bike-share Data Analysis
+
+# PREPARE PHASE
+# Installing and loading the packages
+
+install.packages(leaflet.extras)
+install.packages("leaflet")
+installed.packages("webr")
+install.packages("Matrix")
+webr::install("Matrix")
+install.packages("https://cran.r-project.org/src/contrib/Archive/mnormt/mnormt_1.5-7.tar.gz", 
+                 repos = NULL, 
+                 type = "source")
+install.packages("tidyverse")
+install.packages("skimr") # package required for data cleaning
+install.packages("dplyr")
+
+# loading packages
+library(tidyverse) # meta package of all tidyverse packages
+library(lubridate)
+library(janitor)
+library(skimr)
+library(leaflet)
+library(Matrix)
+library(webr)
+library(dplyr)
+library(ggplot2)
+
+# Importing cyclistic trip datasets
+trip_202301 <- read_csv("trip_202301.csv")
+trip_202302 <- read_csv("trip_202302.csv")
+trip_202303 <- read_csv("trip_202303.csv")
+trip_202304 <- read_csv("trip_202304.csv")
+trip_202305 <- read_csv("trip_202305.csv")
+trip_202306 <- read_csv("trip_202306.csv")
+trip_202307 <- read_csv("trip_202307.csv")
+trip_202308 <- read_csv("trip_202308.csv")
+trip_202309 <- read_csv("trip_202309.csv")
+trip_202310 <- read_csv("trip_202310.csv")
+trip_202311 <- read_csv("trip_202311.csv")
+trip_202312 <- read_csv("trip_202312.csv")
+
+
+# Here I checked all the files for any incongruities that could prevent 
+# the files from merging. All the files were consistent between each other.
+# The functions colnames( ) and str( ) were used for each files:
+
+colnames(trip_202301)
+str(trip_202312)
+
+compare_df_cols_same(
+  trip_202301, trip_202302, trip_202303, trip_202304, trip_202305, trip_202306, 
+  trip_202307, trip_202308, trip_202309, trip_202310, trip_202311, trip_202312,
+  bind_method = c("bind_rows", "rbind"),
+  verbose = TRUE)
+
+# If some of the columns in one of the files is different data type, 
+# then here is how you can change it. For example:
+
+trip_202301 <- mutate(trip_202301, start_station_id = as.character(start_station_id), 
+                      end_station_id = as.character(end_station_id))
+
+
+# After checking all the files I have combined them into one data frame 
+cyclistic_2023 <- bind_rows(trip_202301,trip_202302,trip_202303,trip_202304,
+                          trip_202305,trip_202306,trip_202307,trip_202308,
+                          trip_202309,trip_202310,trip_202311,trip_202312)
+# Data overview
+# data dimensions (rows x columns)
+dim_desc(cyclistic_2023)
+
+# I created a copy of the combined data frame before starting the data 
+# preparation process just as a safety precaution and as a way of keeping 
+# the original data at hand.
+cyclistic_2023_2 <- cyclistic_2023
+
+# The next step was to inspect the shape and structure of the data frame
+# using the functions head( ), glimpse( ) and str( ):
+
+head(cyclistic_2023_2)
+str(cyclistic_2023_2)
+glimpse(cyclistic_2023_2)
+
+
+# I changed the contents of the column 'member_casual' into capital first letter
+cyclistic_2023_cleaned$member_casual[cyclistic_2023_cleaned$member_casual=="casual"]<-"Casual"
+cyclistic_2023_cleaned$member_casual[cyclistic_2023_cleaned$member_casual=="member"]<-"Member"
+
+# Also I changed the contents of the column 'rideable_type' into capital first letter
+cyclistic_2023_cleaned$rideable_type[cyclistic_2023_cleaned$rideable_type
+                                     =="electric_bike"]<-"Electric Bike"
+cyclistic_2023_cleaned$rideable_type[cyclistic_2023_cleaned$rideable_type
+                                     =="classic_bike"]<-"Classic Bike"
+cyclistic_2023_cleaned$rideable_type[cyclistic_2023_cleaned$rideable_type
+                                     =="docked_bike"]<-"Docked Bike"
+
+# Renaming the 'member_casual' column to 'user_type'
+cyclistic_2023_cleaned <- rename(cyclistic_2023_cleaned, user_type = member_casual)
+cyclistic_2023_cleaned <- rename(cyclistic_2023_cleaned, bike_type = rideable_type)
+
+#____________________
+
+# PROCESS PHASE
+# Counting the number of rows
+num_rows <- cyclistic_2023_cleaned %>%
+  nrow()  # Using n() from dplyr
+print(num_rows) # Result message: [1] 5719877
+
+## Removing irrelevant columns
+# I removed two columns that I did not need (start_station_id, end_station_id). 
+cyclistic_2023_2 <- cyclistic_2023_2 %>%
+  select(-c(start_station_id, end_station_id))
+
+# Counting Missing Values
+# In order to count how many NA’s there were, 
+# the functions sum( ) and is.na( ) were combined and used:
+
+sum(is.na(cyclistic_2023_2)) # Result message: [1] 1818898
+
+# Here I checked which columns has the NA's 
+colnames(cyclistic_2023_2)[apply(cyclistic_2023_2, 2, anyNA)]
+# Result message: [1] "start_station_name" "end_station_name" "end_lat" "end_lng"  
+
+# Now as I know which columns have missing values, it was important 
+# to understand how big was the impact for the whole data frame, therefore 
+# I calculated the total number of rows with those missing values.
+sum(!complete.cases(cyclistic_2023_2)) # Result message: [1] 1387924
+
+# Removing null & NA values
+cyclistic_2023_cleaned <- na.omit(cyclistic_2023_2) # Method 1 - Remove NA
+cyclistic_2023_cleaned # Result message: [1] 4331953
+
+# Removing duplicate rows based on ride_id column
+cyclistic_20232 <- cyclistic_2023[!duplicated(cyclistic_2023$ride_id), ] 
+
+nrow(cyclistic_20232) - nrow(cyclistic_2023)
+
+
+# Creating 'month', 'day_of_week', 'started_hour' columns
+
+# Creating 'month' column
+# extract month (01 for Jan, 02 for Feb, 03 for March,....)
+cyclistic_2023_cleaned$month <- format(as.Date(cyclistic_2023_cleaned
+                                               $started_at),"%m")
+# Next, I created 'day_of_week' column, which made possible to aggregate 
+# ride data by day of the week.
+cyclistic_2023_cleaned$day_of_week <- format(as.Date(cyclistic_2023_cleaned
+                                                     $started_at), "%A")
+str(cyclistic_2023_cleaned)
+
+# Creating 'started_hour' column by extracting the hour from 'started_at' column into a new column
+cyclistic_2023_cleaned$started_hour <- lubridate::hour(cyclistic_2023_cleaned$started_at) 
+str(cyclistic_2023_cleaned) # If this aproach didn't work for you, then use another way provided below 
+
+# here's another way of creating 'started_hour' column.
+# Manualy creating 'Started_Hour' column
+# 1. Dublicating Started_at column as Started_Hour (2023-01-21 20:05:42)
+cyclistic_2023_cleaned$Started_Hour <- format(cyclistic_2023_cleaned$started_at, 
+                                              format="%H:%M:%OS") # It was supposed to extract time only hms, but in my case it copied everything
+head(test[4:length(names(test))])
+
+# Truncate, remove everything before first white 'space' (2023-01-21 20:05:42)
+cyclistic_2023_cleaned$Started_Hour <- sub(".*? ", "", 
+                                            cyclistic_2023_cleaned$Started_Hour)
+# Truncate, remove everything after first ':' (20:05:42)
+cyclistic_2023_cleaned$Started_Hour <- sub('^([^:]+).*', '\\1', 
+                                            cyclistic_2023_cleaned$Started_Hour) # the results will be (20)
+# As the result you will have a new column created called 'Started_Hour' wich will consist of only hour, e.g. 0, 01, 02... 21,22,23.
+
+#__________
+# Here is another way of creating 'month', 'day_of_week' and 'started_hour' columns
+# Create 3 new columns: 'month', 'day_of_week', and 'started_hour' extracted from 
+# the datetime column 'started_at' and convert them to factors where needed.
+all_trips <- all_trips %>% 
+  mutate(month = format(as.Date(cyclistic_2023_cleaned$started_at), "%Y-%m") %>% as.factor(),
+         day_of_week = wday(started_at, label = TRUE, abbr = FALSE, 
+                            week_start = getOption("lubridate.week.start", 1)),
+         hour = hour(started_at) %>% as.factor()) 
+#__________
+
+# I created ‘ride_length’ column by subtracting 'started_at' from 'ended_at' columns. 
+# The function difftime( ) was used to create 'ride_length', 
+# which gives us the total length of each trip.
+
+# Also the function as.numeric( ) made it possible to convert 'ride_length' 
+# into numeric making easier its manipulation during analysis:
+
+cyclistic_2023_cleaned$ride_length <- difftime(cyclistic_2023_cleaned$ended_at,
+                                               cyclistic_2023_cleaned$started_at)
+
+cyclistic_2023_cleaned$ride_length <- as.numeric(cyclistic_2023_cleaned
+                                                 $ride_length)
+
+# When the 'ride_length' column was created the time was shown in seconds.
+# Here I changed it into minutes.
+cyclistic_2023_cleaned$ride_length <- cyclistic_2023_cleaned$ride_length/60
+
+#_________
+# Here is another way of creating 'ride_length' column
+# Calculating and creating a new column 'ride_length' in minutes, 
+# then converting it to a numeric data type and rounding to 2 decimal places.
+
+cyclistic_2023_cleaned <- cyclistic_2023_cleaned %>% 
+  mutate(ride_length = difftime(ended_at, started_at, units="mins") %>% 
+           as.numeric() %>% round(2))
+#_________
+
+
+# Count a specific value in a column, in this case how many 
+# rides have less than or equal to 1 m and also more than 10 h
+length(which(cyclistic_2023_cleaned$ride_length >=600))
+
+# I deleted rows from the ‘ride_length’ column where the ride length was 
+# less than or equal to 1 minute; also where the ride length was more than 10 h
+
+cyclistic_2023_cleaned <- cyclistic_2023_cleaned[-which(
+  cyclistic_2023_cleaned$ride_length<=1),]
+# [1] 88388 rows were deleted
+cyclistic_2023_cleaned <- cyclistic_2023_cleaned[-which(
+  cyclistic_2023_cleaned$ride_length>=600),]
+# [1] 3344 rows were deleted
+
+
+# Counting the total number of rows
+num_rows <- cyclistic_2023_cleaned %>%
+  nrow()  # Using n() from dplyr
+print(num_rows) # Result message: [1] 4240221
+
+# Let’s see the summary statistics.
+skim_without_charts(cyclistic_2023_cleaned)
+
